@@ -1,0 +1,9 @@
+# This Vercel project hosts only the public Expo website.
+# The separate Fastify API is not deployed as Vercel Serverless Functions.
+api/
+
+# Local development files.
+.expo/
+.bun-tmp/
+.bun-cache/
+node_modules/
