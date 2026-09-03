@@ -151,9 +151,6 @@ export function LandingPage() {
         style={[styles.advantagesSection, isWideLayout && styles.widePadding]}
       >
         <View style={styles.advantagesHeading}>
-          <Text selectable style={styles.sectionNumber}>
-            01
-          </Text>
           <Text selectable style={styles.sectionTitle}>
             A better place to begin.
           </Text>
@@ -176,9 +173,6 @@ export function LandingPage() {
         <View
           style={[styles.processHeading, isWideLayout && styles.widePadding]}
         >
-          <Text selectable style={styles.sectionNumber}>
-            02
-          </Text>
           <Text selectable style={styles.sectionTitle}>
             A simple route to your training app.
           </Text>
