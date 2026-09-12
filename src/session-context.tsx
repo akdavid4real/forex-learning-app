@@ -1,12 +1,11 @@
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
-
 import { isSupabaseConfigured, supabase } from './supabase';
 
 type SessionContextValue = {
+  configured: boolean;
   loading: boolean;
   session: Session | null;
-  configured: boolean;
   signIn: (email: string, password: string) => Promise<string | null>;
   signUp: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
@@ -19,51 +18,36 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const [loading, setLoading] = useState(isSupabaseConfigured);
 
   useEffect(() => {
-    if (!supabase) {
-      setLoading(false);
-      return;
-    }
-
+    if (!supabase) { setLoading(false); return; }
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (active) {
-        setSession(data.session);
-        setLoading(false);
-      }
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      setSession(data.session);
+      setLoading(false);
     });
-
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
       setLoading(false);
     });
-
-    return () => {
-      active = false;
-      data.subscription.unsubscribe();
-    };
+    return () => { active = false; data.subscription.unsubscribe(); };
   }, []);
 
-  const value = useMemo<SessionContextValue>(
-    () => ({
-      configured: isSupabaseConfigured,
-      loading,
-      session,
-      async signIn(email, password) {
-        if (!supabase) return 'Authentication is not configured yet.';
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        return error?.message ?? null;
-      },
-      async signUp(email, password) {
-        if (!supabase) return 'Authentication is not configured yet.';
-        const { error } = await supabase.auth.signUp({ email, password });
-        return error?.message ?? null;
-      },
-      async signOut() {
-        if (supabase) await supabase.auth.signOut();
-      },
-    }),
-    [loading, session],
-  );
+  const value = useMemo<SessionContextValue>(() => ({
+    configured: isSupabaseConfigured,
+    loading,
+    session,
+    async signIn(email, password) {
+      if (!supabase) return 'Authentication is not configured yet.';
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      return error?.message ?? null;
+    },
+    async signUp(email, password) {
+      if (!supabase) return 'Authentication is not configured yet.';
+      const { error } = await supabase.auth.signUp({ email: email.trim(), password });
+      return error?.message ?? null;
+    },
+    async signOut() { if (supabase) await supabase.auth.signOut(); },
+  }), [loading, session]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
