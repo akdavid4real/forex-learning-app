@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 
 import type { AppServices } from '../app.ts';
-import { requireUser } from '../plugins/auth.ts';
+import { requireActiveLearner } from '../plugins/auth.ts';
 
 type LessonParams = {
   lessonId: string;
@@ -9,7 +9,7 @@ type LessonParams = {
 
 export function createLessonRoutes(services: AppServices): FastifyPluginAsync {
   return async function lessonRoutes(app) {
-    app.get('/:lessonId', { preHandler: requireUser(services) }, async (request, reply) => {
+    app.get('/:lessonId', { preHandler: requireActiveLearner(services) }, async (request, reply) => {
       const { lessonId } = request.params as LessonParams;
       const { data: lesson, error: lessonError } = await services.supabase!
         .from('lessons')
@@ -18,13 +18,8 @@ export function createLessonRoutes(services: AppServices): FastifyPluginAsync {
         .eq('status', 'published')
         .maybeSingle();
 
-      if (lessonError) {
-        throw lessonError;
-      }
-
-      if (!lesson) {
-        return reply.code(404).send({ error: 'Lesson not found.' });
-      }
+      if (lessonError) throw lessonError;
+      if (!lesson) return reply.code(404).send({ error: 'Lesson not found.' });
 
       const { data: module, error: moduleError } = await services.supabase!
         .from('modules')
@@ -33,13 +28,8 @@ export function createLessonRoutes(services: AppServices): FastifyPluginAsync {
         .eq('status', 'published')
         .maybeSingle();
 
-      if (moduleError) {
-        throw moduleError;
-      }
-
-      if (!module) {
-        return reply.code(404).send({ error: 'Lesson not found.' });
-      }
+      if (moduleError) throw moduleError;
+      if (!module) return reply.code(404).send({ error: 'Lesson not found.' });
 
       const { data: course, error: courseError } = await services.supabase!
         .from('courses')
@@ -48,13 +38,8 @@ export function createLessonRoutes(services: AppServices): FastifyPluginAsync {
         .eq('status', 'published')
         .maybeSingle();
 
-      if (courseError) {
-        throw courseError;
-      }
-
-      if (!course) {
-        return reply.code(404).send({ error: 'Lesson not found.' });
-      }
+      if (courseError) throw courseError;
+      if (!course) return reply.code(404).send({ error: 'Lesson not found.' });
 
       const { data: earlierModules, error: earlierModuleError } = await services.supabase!
         .from('modules')
@@ -64,9 +49,7 @@ export function createLessonRoutes(services: AppServices): FastifyPluginAsync {
         .lt('position', module.position)
         .limit(1);
 
-      if (earlierModuleError) {
-        throw earlierModuleError;
-      }
+      if (earlierModuleError) throw earlierModuleError;
 
       if (earlierModules.length > 0) {
         const { data: progress, error: progressError } = await services.supabase!
@@ -76,13 +59,8 @@ export function createLessonRoutes(services: AppServices): FastifyPluginAsync {
           .eq('module_id', module.id)
           .maybeSingle();
 
-        if (progressError) {
-          throw progressError;
-        }
-
-        if (!progress) {
-          return reply.code(403).send({ error: 'Module is locked.' });
-        }
+        if (progressError) throw progressError;
+        if (!progress) return reply.code(403).send({ error: 'Module is locked.' });
       }
 
       return { lesson };
