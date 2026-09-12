@@ -1,20 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
-
-import { demoCourse, demoProfile } from './demo-data';
+import { demoCourse, demoProfile, demoProgress } from './demo-data';
 import {
-  getAchievements,
-  getBookmarks,
-  getCourse,
-  getCourses,
-  getCurrentUser,
-  getLessonProgress,
-  isApiConfigured,
-  type Achievement,
-  type Bookmark,
-  type Course,
-  type CourseRoadmap,
-  type LessonProgress,
-  type UserProfile,
+  getAchievements, getBookmarks, getCourse, getCourses, getCurrentUser, getLearningProgress, isApiConfigured,
+  type Achievement, type Bookmark, type Course, type CourseRoadmap, type LearningProgress, type UserProfile,
 } from './services/forex-api';
 import { useSession } from './session-context';
 
@@ -26,11 +14,12 @@ type LearnerData = {
   error: string | null;
   loading: boolean;
   profile: UserProfile | null;
-  progress: LessonProgress[];
+  progress: LearningProgress;
   refresh: () => Promise<void>;
   selectCourse: (courseId: string) => Promise<void>;
 };
 
+const emptyProgress: LearningProgress = { lessons: [], modules: [], quizzes: [] };
 const LearnerDataContext = createContext<LearnerData | null>(null);
 
 export function LearnerDataProvider({ children }: PropsWithChildren) {
@@ -38,75 +27,45 @@ export function LearnerDataProvider({ children }: PropsWithChildren) {
   const [courses, setCourses] = useState<Course[]>([]);
   const [currentCourse, setCurrentCourse] = useState<CourseRoadmap | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [progress, setProgress] = useState<LessonProgress[]>([]);
+  const [progress, setProgress] = useState<LearningProgress>(emptyProgress);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const selectCourse = useCallback(async (courseId: string) => {
-    if (!isApiConfigured()) {
-      setCurrentCourse(demoCourse);
-      return;
-    }
+    if (!isApiConfigured()) { setCurrentCourse(demoCourse); return; }
     const data = await getCourse(courseId, session?.access_token);
     setCurrentCourse(data.course);
   }, [session?.access_token]);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
+    setLoading(true); setError(null);
     if (!isApiConfigured()) {
-      setCourses([demoCourse]);
-      setCurrentCourse(demoCourse);
-      setProfile(session ? demoProfile : null);
-      setProgress([]);
-      setBookmarks([]);
-      setAchievements([]);
-      setLoading(false);
-      return;
+      setCourses([demoCourse]); setCurrentCourse(demoCourse); setProfile(demoProfile); setProgress(demoProgress); setBookmarks([]); setAchievements([]); setLoading(false); return;
     }
-
     try {
       const courseResult = await getCourses();
       setCourses(courseResult.courses);
-      if (courseResult.courses[0]) await selectCourse(courseResult.courses[0].id);
-
+      const keepId = currentCourse?.id && courseResult.courses.some((course) => course.id === currentCourse.id) ? currentCourse.id : courseResult.courses[0]?.id;
+      if (keepId) await selectCourse(keepId); else setCurrentCourse(null);
       if (session?.access_token) {
         const [profileResult, progressResult, bookmarkResult, achievementResult] = await Promise.all([
-          getCurrentUser(session.access_token),
-          getLessonProgress(session.access_token),
-          getBookmarks(session.access_token),
-          getAchievements(session.access_token),
+          getCurrentUser(session.access_token), getLearningProgress(session.access_token), getBookmarks(session.access_token), getAchievements(session.access_token),
         ]);
-        setProfile(profileResult.profile);
-        setProgress(progressResult.lessons);
-        setBookmarks(bookmarkResult.bookmarks);
-        setAchievements(achievementResult.achievements);
+        setProfile(profileResult.profile); setProgress(progressResult); setBookmarks(bookmarkResult.bookmarks); setAchievements(achievementResult.achievements);
+      } else {
+        setProfile(null); setProgress(emptyProgress); setBookmarks([]); setAchievements([]);
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to load learner data.');
-    } finally {
-      setLoading(false);
-    }
-  }, [selectCourse, session]);
+    } finally { setLoading(false); }
+  }, [currentCourse?.id, selectCourse, session?.access_token]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { void refresh(); }, [session?.access_token]);
 
-  const value = useMemo(() => ({
-    achievements,
-    bookmarks,
-    courses,
-    currentCourse,
-    error,
-    loading,
-    profile,
-    progress,
-    refresh,
-    selectCourse,
-  }), [achievements, bookmarks, courses, currentCourse, error, loading, profile, progress, refresh, selectCourse]);
-
+  const value = useMemo(() => ({ achievements, bookmarks, courses, currentCourse, error, loading, profile, progress, refresh, selectCourse }),
+    [achievements, bookmarks, courses, currentCourse, error, loading, profile, progress, refresh, selectCourse]);
   return <LearnerDataContext.Provider value={value}>{children}</LearnerDataContext.Provider>;
 }
 
