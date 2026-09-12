@@ -37,6 +37,39 @@ export function requireUser(services: AppServices) {
   };
 }
 
+export function requireActiveLearner(services: AppServices) {
+  const authenticate = requireUser(services);
+
+  return async function authorizeLearner(
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ) {
+    await authenticate(request, reply);
+
+    if (reply.sent) return;
+
+    const { data, error } = await services.supabase!
+      .from('profiles')
+      .select('access_status')
+      .eq('id', request.user.id)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) {
+      return reply.code(403).send({ error: 'Learner profile is not available.' });
+    }
+    if (data.access_status !== 'active') {
+      return reply.code(403).send({
+        error:
+          data.access_status === 'suspended'
+            ? 'Learner access is suspended.'
+            : 'Learner access is awaiting approval.',
+        access_status: data.access_status,
+      });
+    }
+  };
+}
+
 export function requireAdmin(services: AppServices) {
   const authenticate = requireUser(services);
 
