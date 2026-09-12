@@ -40,26 +40,59 @@ export function LearnerDataProvider({ children }: PropsWithChildren) {
   }, [session?.access_token]);
 
   const refresh = useCallback(async () => {
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
+
     if (!isApiConfigured()) {
-      setCourses([demoCourse]); setCurrentCourse(demoCourse); setProfile(demoProfile); setProgress(demoProgress); setBookmarks([]); setAchievements([]); setLoading(false); return;
+      setCourses([demoCourse]);
+      setCurrentCourse(demoCourse);
+      setProfile(demoProfile);
+      setProgress(demoProgress);
+      setBookmarks([]);
+      setAchievements([]);
+      setLoading(false);
+      return;
     }
+
     try {
       const courseResult = await getCourses();
       setCourses(courseResult.courses);
-      const keepId = currentCourse?.id && courseResult.courses.some((course) => course.id === currentCourse.id) ? currentCourse.id : courseResult.courses[0]?.id;
+      const keepId = currentCourse?.id && courseResult.courses.some((course) => course.id === currentCourse.id)
+        ? currentCourse.id
+        : courseResult.courses[0]?.id;
       if (keepId) await selectCourse(keepId); else setCurrentCourse(null);
-      if (session?.access_token) {
-        const [profileResult, progressResult, bookmarkResult, achievementResult] = await Promise.all([
-          getCurrentUser(session.access_token), getLearningProgress(session.access_token), getBookmarks(session.access_token), getAchievements(session.access_token),
-        ]);
-        setProfile(profileResult.profile); setProgress(progressResult); setBookmarks(bookmarkResult.bookmarks); setAchievements(achievementResult.achievements);
-      } else {
-        setProfile(null); setProgress(emptyProgress); setBookmarks([]); setAchievements([]);
+
+      if (!session?.access_token) {
+        setProfile(null);
+        setProgress(emptyProgress);
+        setBookmarks([]);
+        setAchievements([]);
+        return;
       }
+
+      const profileResult = await getCurrentUser(session.access_token);
+      setProfile(profileResult.profile);
+
+      if (!profileResult.profile || profileResult.profile.access_status !== 'active') {
+        setProgress(emptyProgress);
+        setBookmarks([]);
+        setAchievements([]);
+        return;
+      }
+
+      const [progressResult, bookmarkResult, achievementResult] = await Promise.all([
+        getLearningProgress(session.access_token),
+        getBookmarks(session.access_token),
+        getAchievements(session.access_token),
+      ]);
+      setProgress(progressResult);
+      setBookmarks(bookmarkResult.bookmarks);
+      setAchievements(achievementResult.achievements);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to load learner data.');
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }, [currentCourse?.id, selectCourse, session?.access_token]);
 
   useEffect(() => { void refresh(); }, [session?.access_token]);
