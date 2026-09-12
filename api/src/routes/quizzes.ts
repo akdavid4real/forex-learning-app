@@ -84,7 +84,7 @@ export function createQuizRoutes(services: AppServices): FastifyPluginAsync {
 
       const { data: questions, error: questionError } = await services.supabase!
         .from('quiz_questions')
-        .select('id, position, prompt, answers, explanation')
+        .select('id, position, prompt, answers')
         .eq('quiz_id', quizId)
         .order('position');
       if (questionError) throw questionError;
