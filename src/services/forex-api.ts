@@ -1,7 +1,8 @@
 const apiBaseUrl = process.env.EXPO_PUBLIC_API_URL;
 
 export type Course = { id: string; slug: string; title: string; description: string };
-export type LessonSummary = { id: string; module_id: string; title: string; position: number; estimated_minutes: number };
+export type Lesson = { content?: unknown; estimated_minutes: number; id: string; module_id: string; position: number; title: string };
+export type LessonSummary = Lesson;
 export type QuizSummary = { id: string; module_id: string; title: string; passing_score: number; xp_reward: number };
 export type CourseModule = {
   id: string;
@@ -11,13 +12,14 @@ export type CourseModule = {
   description?: string | null;
   lessons: LessonSummary[];
   quizzes: QuizSummary[];
+  unlocked?: boolean;
+  completed?: boolean;
 };
 export type CourseRoadmap = Course & { modules: CourseModule[] };
 export type UserProfile = { avatar_url: string | null; current_streak: number; display_name: string | null; id: string; longest_streak: number; xp: number };
 export type Achievement = { id: string; slug?: string; title?: string; description?: string | null; earned_at?: string };
 export type QuizQuestion = { answers: unknown; explanation: string | null; id: string; position: number; prompt: string };
 export type Quiz = { id: string; passing_score: number; quiz_questions: QuizQuestion[]; title: string };
-export type Lesson = { content: unknown; estimated_minutes: number; id: string; module_id: string; position: number; title: string };
 export type QuizAttempt = { attempt_id: string; awarded_xp: number; passed: boolean; score: number; unlocked_module_id: string | null };
 export type LessonProgress = { completed_at: string | null; last_viewed_at: string; lesson_id: string; lessons?: { id: string; title: string; module_id: string } | null };
 export type ModuleProgress = { module_id: string; unlocked_at: string; completed_at: string | null };
