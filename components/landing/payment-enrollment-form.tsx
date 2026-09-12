@@ -1,4 +1,4 @@
-import { Check, LockKeyhole, MessageCircle, Send } from "lucide-react-native";
+import { AlertTriangle, Check, LockKeyhole, MessageCircle, Send } from "lucide-react-native";
 import { useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -25,14 +25,34 @@ export function PaymentEnrollmentForm({ onPaymentSubmitted }: PaymentEnrollmentF
   const whatsAppLink = `https://wa.me/${whatsAppNumber}?text=${encodeURIComponent(paymentProofMessage)}`;
 
   async function openWhatsApp() {
-    if (!hasRequiredDetails) return;
+    if (!hasRequiredDetails || !paymentDetails.configured) return;
     await Linking.openURL(whatsAppLink);
   }
 
   function confirmProofSent() {
-    if (!hasRequiredDetails || hasConfirmedProof) return;
+    if (!hasRequiredDetails || hasConfirmedProof || !paymentDetails.configured) return;
     setHasConfirmedProof(true);
     onPaymentSubmitted();
+  }
+
+  if (!paymentDetails.configured) {
+    return (
+      <View style={styles.enrollmentSection}>
+        <View style={styles.enrollmentIntro}>
+          <Text selectable style={styles.eyebrow}>ENROLLMENT</Text>
+          <Text selectable style={styles.sectionTitle}>Enrollment details are being finalized.</Text>
+          <Text selectable style={styles.sectionDescription}>
+            Payment instructions are temporarily unavailable. Do not transfer funds until the official bank and WhatsApp details are displayed on this page.
+          </Text>
+          <View style={styles.configWarning}>
+            <AlertTriangle color={colors.accent} size={20} strokeWidth={2.2} />
+            <Text selectable style={styles.configWarningText}>
+              No payment should be sent based on screenshots, unofficial numbers, or placeholder account details.
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -56,14 +76,7 @@ export function PaymentEnrollmentForm({ onPaymentSubmitted }: PaymentEnrollmentF
         <Text selectable style={styles.formDescription}>
           This should be the same email you will use when your learner account is activated.
         </Text>
-        <FormField
-          autoCapitalize="none"
-          keyboardType="email-address"
-          label="Email address"
-          onChangeText={setEmail}
-          placeholder="you@example.com"
-          value={email}
-        />
+        <FormField autoCapitalize="none" keyboardType="email-address" label="Email address" onChangeText={setEmail} placeholder="you@example.com" value={email} />
 
         <View style={styles.divider} />
         <Text selectable style={styles.formTitle}>Make your payment</Text>
@@ -75,35 +88,17 @@ export function PaymentEnrollmentForm({ onPaymentSubmitted }: PaymentEnrollmentF
           <PaymentDetail label="Account name" value={paymentDetails.accountName} />
           <PaymentDetail label="Account number" value={paymentDetails.accountNumber} />
         </View>
-        <FormField
-          label="Payment reference"
-          onChangeText={setPaymentReference}
-          placeholder="Enter your transfer reference"
-          value={paymentReference}
-        />
+        <FormField label="Payment reference" onChangeText={setPaymentReference} placeholder="Enter your transfer reference" value={paymentReference} />
 
-        <Pressable
-          accessibilityLabel="Send proof of payment through WhatsApp"
-          disabled={!hasRequiredDetails}
-          onPress={() => void openWhatsApp()}
-          style={[styles.proofButton, !hasRequiredDetails && styles.disabledButton]}
-        >
+        <Pressable accessibilityLabel="Send proof of payment through WhatsApp" disabled={!hasRequiredDetails} onPress={() => void openWhatsApp()} style={[styles.proofButton, !hasRequiredDetails && styles.disabledButton]}>
           <MessageCircle color={colors.background} size={19} strokeWidth={2.4} />
           <Text style={styles.proofButtonText}>Open WhatsApp to send proof</Text>
         </Pressable>
-        <Text selectable style={styles.whatsAppNumber}>
-          Official payment proof number: {paymentDetails.whatsAppProofNumber}
-        </Text>
+        <Text selectable style={styles.whatsAppNumber}>Official payment proof number: {paymentDetails.whatsAppProofNumber}</Text>
 
-        <Pressable
-          disabled={!hasRequiredDetails || hasConfirmedProof}
-          onPress={confirmProofSent}
-          style={[styles.submitButton, (!hasRequiredDetails || hasConfirmedProof) && styles.disabledButton]}
-        >
+        <Pressable disabled={!hasRequiredDetails || hasConfirmedProof} onPress={confirmProofSent} style={[styles.submitButton, (!hasRequiredDetails || hasConfirmedProof) && styles.disabledButton]}>
           {hasConfirmedProof ? <Check color={colors.background} size={20} strokeWidth={2.6} /> : <Send color={colors.background} size={19} strokeWidth={2.3} />}
-          <Text style={styles.submitButtonText}>
-            {hasConfirmedProof ? "Proof marked as sent" : "I have sent my payment proof"}
-          </Text>
+          <Text style={styles.submitButtonText}>{hasConfirmedProof ? "Proof marked as sent" : "I have sent my payment proof"}</Text>
         </Pressable>
         <Text selectable style={styles.manualNote}>
           This confirmation does not automatically approve payment. Access is released only after the team verifies the transfer.
@@ -126,27 +121,13 @@ function FormField({ autoCapitalize, keyboardType, label, onChangeText, placehol
   return (
     <View style={styles.fieldGroup}>
       <Text selectable style={styles.fieldLabel}>{label}</Text>
-      <TextInput
-        accessibilityLabel={label}
-        autoCapitalize={autoCapitalize}
-        keyboardType={keyboardType}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.mutedText}
-        style={styles.input}
-        value={value}
-      />
+      <TextInput accessibilityLabel={label} autoCapitalize={autoCapitalize} keyboardType={keyboardType} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.mutedText} style={styles.input} value={value} />
     </View>
   );
 }
 
 function PaymentDetail({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.accountDetail}>
-      <Text selectable style={styles.accountLabel}>{label}</Text>
-      <Text selectable style={styles.accountValue}>{value}</Text>
-    </View>
-  );
+  return <View style={styles.accountDetail}><Text selectable style={styles.accountLabel}>{label}</Text><Text selectable style={styles.accountValue}>{value}</Text></View>;
 }
 
 const styles = StyleSheet.create({
@@ -157,6 +138,8 @@ const styles = StyleSheet.create({
   sectionDescription: { color: colors.mutedText, fontSize: 16, lineHeight: 25 },
   lockNotice: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 7 },
   lockNoticeText: { flex: 1, color: "#F4D68C", fontSize: 14, fontWeight: "700", lineHeight: 21 },
+  configWarning: { flexDirection: "row", gap: 10, padding: 16, borderRadius: 12, borderWidth: 1, borderColor: "#6A5217", backgroundColor: "#241D0D" },
+  configWarningText: { flex: 1, color: "#F4D68C", fontSize: 14, lineHeight: 21, fontWeight: "700" },
   enrollmentCard: { gap: 16, width: "100%", maxWidth: 560, alignSelf: "center", padding: 24, borderWidth: 1, borderColor: "#2B4262", borderRadius: 22, backgroundColor: colors.surface },
   formTitle: { color: colors.text, fontSize: 20, fontWeight: "800" },
   formDescription: { color: colors.mutedText, fontSize: 14, lineHeight: 21 },
