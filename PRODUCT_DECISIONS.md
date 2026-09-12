@@ -1,10 +1,15 @@
 # Forex Learning App — MVP Product Decisions
 
-This branch treats the product as a learning platform first. The authenticated learner experience is the primary application; the existing public landing/enrollment components remain a separate marketing surface rather than replacing the learner app at startup.
+This branch treats the product as a learning platform first with two intentional surfaces from the same Expo codebase:
+
+- **Web:** the existing public Forex Learning marketing/enrollment experience.
+- **iOS/Android:** the authenticated learner product.
+
+The platform-aware root preserves the public `uefatraders.com` experience instead of replacing it with an authenticated app shell.
 
 ## Architecture
 
-- React Native / Expo is the learner client.
+- React Native / Expo is the shared client foundation.
 - Fastify remains the source of application business logic.
 - Supabase is infrastructure for Auth, Postgres, and Storage only.
 - The Supabase service-role key never ships in the Expo app.
@@ -35,8 +40,8 @@ Email/password Supabase authentication is the launch baseline. Sessions persist 
 
 - This is an educational product, not a trading-signal service.
 - The product does not execute trades or promise returns.
-- Learning content should emphasize capital protection, risk, process, and uncertainty rather than hype or guaranteed outcomes.
-- A visible education/risk disclaimer should accompany public marketing and any later market-data surface.
+- Learning content emphasizes capital protection, risk, process, and uncertainty rather than hype or guaranteed outcomes.
+- Public marketing and any future market-data surface should include a visible educational/risk disclaimer.
 
 ## Explicit non-blockers for launch
 
@@ -52,4 +57,4 @@ The existing landing/enrollment flow can continue handling commercial enrollment
 
 ## Completion target
 
-A learner can create an account, sign in, open a course, complete lessons, take scored quizzes, unlock the next module, earn XP/achievements, maintain a streak, bookmark lessons, view progress, sign out, and resume later on a restored session.
+A learner can create an account, sign in, open a course, complete lessons, take scored quizzes, unlock the next module, earn XP/achievements, maintain a streak, bookmark lessons, view progress, sign out, and resume later on a restored session, while the public website continues to handle discovery and enrollment.
