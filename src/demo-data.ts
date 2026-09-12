@@ -1,7 +1,7 @@
 import type { CourseRoadmap, LearningProgress, UserProfile } from './services/forex-api';
 
 export const demoProfile: UserProfile = {
-  id: 'demo-user', display_name: 'Demo Learner', avatar_url: null, xp: 35, current_streak: 2, longest_streak: 4,
+  id: 'demo-user', display_name: 'Demo Learner', avatar_url: null, xp: 35, current_streak: 2, longest_streak: 4, access_status: 'active',
 };
 
 export const demoCourse: CourseRoadmap = {
