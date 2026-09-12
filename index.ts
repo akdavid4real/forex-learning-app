@@ -1,8 +1,8 @@
 import { registerRootComponent } from 'expo';
 
-import { LandingPage } from "./components/landing/landing-page";
+import App from './App';
 
-// registerRootComponent registers the public website as the app entry point.
-// It also ensures that whether you load the app in Expo Go or in a native build,
-// the environment is set up appropriately
-registerRootComponent(LandingPage);
+// The learner application is the native/Expo entry point.
+// The public landing page is kept as a web surface/component rather than replacing
+// the authenticated learning experience at application startup.
+registerRootComponent(App);
