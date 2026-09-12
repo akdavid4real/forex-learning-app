@@ -12,24 +12,34 @@ export function AuthScreen() {
   const [message, setMessage] = useState<string | null>(null);
 
   async function submit() {
-    if (!email.trim() || password.length < 6) { setMessage('Enter a valid email and a password of at least 6 characters.'); return; }
-    setBusy(true); setMessage(null);
+    if (!email.trim() || password.length < 6) {
+      setMessage('Enter a valid email and a password of at least 6 characters.');
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
     const error = mode === 'signin' ? await signIn(email, password) : await signUp(email, password);
     setBusy(false);
     if (error) setMessage(error);
-    else if (mode === 'signup') setMessage('Account created. If email confirmation is enabled, confirm your email, then sign in.');
+    else if (mode === 'signup') {
+      setMessage('Account created. Confirm your email if requested. Learning access remains pending until your enrollment/payment is approved.');
+    }
   }
 
   return (
     <SafeAreaView style={styles.page}>
       <View style={styles.card}>
         <Text style={styles.eyebrow}>FOREX LEARNING</Text>
-        <Text style={styles.title}>{mode === 'signin' ? 'Welcome back' : 'Start learning forex'}</Text>
-        <Text style={styles.copy}>Learn market structure, risk and execution with progress that follows you across devices.</Text>
+        <Text style={styles.title}>{mode === 'signin' ? 'Welcome back' : 'Create your learner account'}</Text>
+        <Text style={styles.copy}>
+          {mode === 'signin'
+            ? 'Sign in to continue your approved learning path.'
+            : 'Use the same email you used for enrollment. New accounts remain pending until the team approves access.'}
+        </Text>
         <TextInput value={email} onChangeText={setEmail} placeholder="Email" placeholderTextColor={colors.mutedText} autoCapitalize="none" keyboardType="email-address" style={styles.input} />
         <TextInput value={password} onChangeText={setPassword} placeholder="Password" placeholderTextColor={colors.mutedText} secureTextEntry style={styles.input} />
         {message ? <Text style={styles.message}>{message}</Text> : null}
-        <Pressable onPress={() => void submit()} disabled={busy} style={styles.primary}>{busy ? <ActivityIndicator /> : <Text style={styles.primaryText}>{mode === 'signin' ? 'Sign in' : 'Create account'}</Text>}</Pressable>
+        <Pressable onPress={() => void submit()} disabled={busy} style={styles.primary}>{busy ? <ActivityIndicator /> : <Text style={styles.primaryText}>{mode === 'signin' ? 'Sign in' : 'Create pending account'}</Text>}</Pressable>
         <Pressable onPress={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setMessage(null); }}><Text style={styles.switchText}>{mode === 'signin' ? 'New here? Create an account' : 'Already have an account? Sign in'}</Text></Pressable>
       </View>
     </SafeAreaView>
