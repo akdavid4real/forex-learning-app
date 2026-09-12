@@ -16,7 +16,8 @@ export type CourseModule = {
   completed?: boolean;
 };
 export type CourseRoadmap = Course & { modules: CourseModule[] };
-export type UserProfile = { avatar_url: string | null; current_streak: number; display_name: string | null; id: string; longest_streak: number; xp: number };
+export type LearnerAccessStatus = 'pending' | 'active' | 'suspended';
+export type UserProfile = { avatar_url: string | null; current_streak: number; display_name: string | null; id: string; longest_streak: number; xp: number; access_status: LearnerAccessStatus };
 export type Achievement = { id: string; slug?: string; title?: string; description?: string | null; earned_at?: string };
 export type QuizQuestion = { answers: unknown; explanation?: string | null; id: string; position: number; prompt: string };
 export type Quiz = { id: string; passing_score: number; quiz_questions: QuizQuestion[]; title: string };
