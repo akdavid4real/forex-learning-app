@@ -5,7 +5,10 @@ This file tracks the MVP-completion branch.
 ## Product implementation
 
 - [x] Record product decisions
-- [x] Restore learner app as native/Expo entry point
+- [x] Preserve public web enrollment while native launches the learner app
+- [x] Remove NIN, fake email verification, and browser-only referral enrollment fields
+- [x] Make payment enrollment manual and fail closed when official payment details are missing
+- [x] Add visible education/forex-risk positioning to the public surface
 - [x] Supabase client/session/auth UI
 - [x] Durable mobile session persistence
 - [x] API-backed courses and dynamic roadmap
@@ -28,9 +31,10 @@ These are environment/deployment operations rather than missing product code:
 
 - Apply Supabase migrations `0001`, `0002`, `0003`, then `0004` to the target project.
 - Configure the root Expo environment with `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_SUPABASE_URL`, and `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
+- Configure the public enrollment display values: `EXPO_PUBLIC_PAYMENT_BANK_NAME`, `EXPO_PUBLIC_PAYMENT_ACCOUNT_NAME`, `EXPO_PUBLIC_PAYMENT_ACCOUNT_NUMBER`, and `EXPO_PUBLIC_PAYMENT_WHATSAPP_NUMBER`.
 - Configure the Fastify service with its Supabase service-role credentials and allowed origins.
 - Deploy the Fastify API as its own service and point `EXPO_PUBLIC_API_URL` at `/api/v1` on that service.
-- Install dependencies once network access is available so the root Bun lockfile can be refreshed for the newly declared Supabase/AsyncStorage dependencies.
+- Regenerate the root Bun lockfile with a Vercel-compatible Bun version. Current Vercel builds complete, but the committed lockfile format is ignored and dependencies are re-resolved.
 
 ## Deliberate launch scope
 
