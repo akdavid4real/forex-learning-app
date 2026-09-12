@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
 import type { AppServices } from '../app.ts';
-import { requireUser } from '../plugins/auth.ts';
+import { requireActiveLearner } from '../plugins/auth.ts';
 
 const submitQuizBodySchema = z.object({
   answers: z.array(z.number().int().nonnegative()),
@@ -12,7 +12,7 @@ type QuizParams = { quizId: string };
 
 export function createQuizRoutes(services: AppServices): FastifyPluginAsync {
   return async function quizRoutes(app) {
-    app.get('/:quizId', { preHandler: requireUser(services) }, async (request, reply) => {
+    app.get('/:quizId', { preHandler: requireActiveLearner(services) }, async (request, reply) => {
       const { quizId } = request.params as QuizParams;
       const { data, error } = await services.supabase!
         .from('quizzes')
@@ -92,7 +92,7 @@ export function createQuizRoutes(services: AppServices): FastifyPluginAsync {
       return { quiz: { ...data, quiz_questions: questions } };
     });
 
-    app.post('/:quizId/attempts', { preHandler: requireUser(services) }, async (request, reply) => {
+    app.post('/:quizId/attempts', { preHandler: requireActiveLearner(services) }, async (request, reply) => {
       const parsedBody = submitQuizBodySchema.safeParse(request.body);
       if (!parsedBody.success) return reply.code(400).send({ error: 'Quiz answers must be an array of answer indexes.' });
       const { quizId } = request.params as QuizParams;
