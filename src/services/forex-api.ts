@@ -7,6 +7,22 @@ export type Course = {
   title: string;
 };
 
+export type CourseModule = {
+  id: string;
+  course_id: string;
+  position: number;
+  title: string;
+  description?: string | null;
+  unlocked?: boolean;
+  completed?: boolean;
+  lessons?: Lesson[];
+  quizzes?: Array<{ id: string; title: string; passing_score: number }>;
+};
+
+export type CourseRoadmap = Course & {
+  modules?: CourseModule[];
+};
+
 export type UserProfile = {
   avatar_url: string | null;
   current_streak: number;
@@ -14,6 +30,14 @@ export type UserProfile = {
   id: string;
   longest_streak: number;
   xp: number;
+};
+
+export type Achievement = {
+  id: string;
+  key?: string;
+  title?: string;
+  description?: string | null;
+  awarded_at?: string;
 };
 
 export type QuizQuestion = {
@@ -54,13 +78,16 @@ export type LessonProgress = {
   lesson_id: string;
 };
 
-type ApiErrorBody = {
-  error?: string;
+export type Bookmark = {
+  lesson_id: string;
+  created_at?: string;
+  lessons?: Lesson | null;
 };
+
+type ApiErrorBody = { error?: string };
 
 export class ApiError extends Error {
   status: number;
-
   constructor(message: string, status: number) {
     super(message);
     this.name = 'ApiError';
@@ -68,36 +95,23 @@ export class ApiError extends Error {
   }
 }
 
-function getApiBaseUrl() {
-  if (!apiBaseUrl) {
-    throw new ApiError('EXPO_PUBLIC_API_URL is not configured.', 0);
-  }
+export function isApiConfigured() {
+  return Boolean(apiBaseUrl);
+}
 
+function getApiBaseUrl() {
+  if (!apiBaseUrl) throw new ApiError('EXPO_PUBLIC_API_URL is not configured.', 0);
   return apiBaseUrl.replace(/\/$/, '');
 }
 
-async function request<T>(
-  path: string,
-  options: RequestInit = {},
-  accessToken?: string,
-) {
+async function request<T>(path: string, options: RequestInit = {}, accessToken?: string) {
   const headers = new Headers(options.headers);
-
-  if (accessToken) {
-    headers.set('Authorization', `Bearer ${accessToken}`);
-  }
-
-  if (options.body) {
-    headers.set('Content-Type', 'application/json');
-  }
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+  if (options.body) headers.set('Content-Type', 'application/json');
 
   let response: Response;
-
   try {
-    response = await fetch(`${getApiBaseUrl()}${path}`, {
-      ...options,
-      headers,
-    });
+    response = await fetch(`${getApiBaseUrl()}${path}`, { ...options, headers });
   } catch {
     throw new ApiError('Unable to reach the learning API.', 0);
   }
@@ -107,6 +121,7 @@ async function request<T>(
     throw new ApiError(errorBody.error ?? 'The API request failed.', response.status);
   }
 
+  if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
 
@@ -114,16 +129,20 @@ export function getCourses() {
   return request<{ courses: Course[] }>('/courses');
 }
 
+export function getCourse(courseId: string, accessToken?: string) {
+  return request<{ course: CourseRoadmap }>(`/courses/${courseId}`, {}, accessToken);
+}
+
 export function getCurrentUser(accessToken: string) {
   return request<{ profile: UserProfile | null }>('/users/me', {}, accessToken);
 }
 
+export function getAchievements(accessToken: string) {
+  return request<{ achievements: Achievement[] }>('/users/me/achievements', {}, accessToken);
+}
+
 export function completeLesson(accessToken: string, lessonId: string) {
-  return request<{ progress: { awarded_xp: number } }>(
-    `/progress/lessons/${lessonId}/complete`,
-    { method: 'POST' },
-    accessToken,
-  );
+  return request<{ progress: { awarded_xp: number } }>(`/progress/lessons/${lessonId}/complete`, { method: 'POST' }, accessToken);
 }
 
 export function getLessonProgress(accessToken: string) {
@@ -138,17 +157,18 @@ export function getQuiz(accessToken: string, quizId: string) {
   return request<{ quiz: Quiz }>(`/quizzes/${quizId}`, {}, accessToken);
 }
 
-export function submitQuizAttempt(
-  accessToken: string,
-  quizId: string,
-  answers: number[],
-) {
-  return request<{ attempt: QuizAttempt }>(
-    `/quizzes/${quizId}/attempts`,
-    {
-      body: JSON.stringify({ answers }),
-      method: 'POST',
-    },
-    accessToken,
-  );
+export function submitQuizAttempt(accessToken: string, quizId: string, answers: number[]) {
+  return request<{ attempt: QuizAttempt }>(`/quizzes/${quizId}/attempts`, { body: JSON.stringify({ answers }), method: 'POST' }, accessToken);
+}
+
+export function getBookmarks(accessToken: string) {
+  return request<{ bookmarks: Bookmark[] }>('/bookmarks', {}, accessToken);
+}
+
+export function saveBookmark(accessToken: string, lessonId: string) {
+  return request(`/bookmarks/${lessonId}`, { method: 'PUT' }, accessToken);
+}
+
+export function removeBookmark(accessToken: string, lessonId: string) {
+  return request(`/bookmarks/${lessonId}`, { method: 'DELETE' }, accessToken);
 }
