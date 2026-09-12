@@ -9,6 +9,7 @@ Fastify API for the Expo forex-learning app. Bun runs the service; Supabase prov
    - `supabase/migrations/0001_learning_schema.sql`
    - `supabase/migrations/0002_learning_rules.sql`
    - `supabase/migrations/0003_seed_forex_foundations.sql`
+   - `supabase/migrations/0004_fix_module_completion.sql`
 3. From `api/`, run `bun install`.
 4. Run `bun run typecheck` and `bun test`.
 5. Start the API with `bun run dev`.
@@ -65,9 +66,10 @@ The client uses these records to display completion and locks, but the server/da
 - First lesson completion can award the one-time first-lesson achievement.
 - A quiz is unavailable until every published lesson in its module is completed.
 - Later modules are unavailable until their unlock record exists.
+- Quiz submissions must contain exactly one answer for every question.
 - A quiz awards its configured XP only for the first passing attempt.
 - First quiz pass can award the one-time first-quiz achievement.
-- Passing marks the current module complete and unlocks the next published module.
+- Passing upserts completion for the current module (including the implicitly unlocked first module) and unlocks the next published module.
 - Learning activity updates the current and longest streak.
 - Quiz answer keys never leave the API.
 
