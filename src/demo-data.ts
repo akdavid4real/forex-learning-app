@@ -1,43 +1,33 @@
-import type { Course, Lesson, Quiz, UserProfile } from './services/forex-api';
+import type { CourseRoadmap, LearningProgress, UserProfile } from './services/forex-api';
 
-export const demoCourse: Course = {
+export const demoProfile: UserProfile = {
+  id: 'demo-user', display_name: 'Demo Learner', avatar_url: null, xp: 35, current_streak: 2, longest_streak: 4,
+};
+
+export const demoCourse: CourseRoadmap = {
   id: 'demo-forex-foundations',
   slug: 'forex-foundations',
   title: 'Forex Foundations',
-  description: 'A practical beginner path covering currency pairs, market structure, risk and execution basics.',
-};
-
-export const demoProfile: UserProfile = {
-  id: 'demo-user',
-  avatar_url: null,
-  display_name: 'Forex Learner',
-  current_streak: 1,
-  longest_streak: 1,
-  xp: 0,
-};
-
-export const demoLesson: Lesson = {
-  id: 'demo-currency-pairs',
-  module_id: 'demo-module-1',
-  position: 1,
-  title: 'Understanding Currency Pairs',
-  estimated_minutes: 8,
-  content: {
-    summary: 'Learn how base and quote currencies work, what a pair price means, and how to read a simple forex quote.',
-  },
-};
-
-export const demoQuiz: Quiz = {
-  id: 'demo-quiz-1',
-  title: 'Currency Pairs Check',
-  passing_score: 70,
-  quiz_questions: [
+  description: 'Build a practical understanding of currency markets, risk and disciplined trading.',
+  modules: [
     {
-      id: 'q1',
-      position: 1,
-      prompt: 'In EUR/USD, which currency is the base currency?',
-      answers: ['EUR', 'USD', 'Both', 'Neither'],
-      explanation: 'The first currency listed in a pair is the base currency.',
+      id: 'demo-module-1', course_id: 'demo-forex-foundations', title: 'Market Foundations', position: 1,
+      description: 'Understand pairs, pips, lots and how the market is quoted.',
+      lessons: [
+        { id: 'demo-lesson-1', module_id: 'demo-module-1', title: 'How currency pairs work', position: 1, estimated_minutes: 6 },
+        { id: 'demo-lesson-2', module_id: 'demo-module-1', title: 'Pips, lots and spread', position: 2, estimated_minutes: 8 },
+      ],
+      quizzes: [{ id: 'demo-quiz-1', module_id: 'demo-module-1', title: 'Market Foundations Check', passing_score: 70, xp_reward: 20 }],
+    },
+    {
+      id: 'demo-module-2', course_id: 'demo-forex-foundations', title: 'Risk Before Reward', position: 2,
+      description: 'Learn position sizing, stop loss and risk-to-reward discipline.',
+      lessons: [{ id: 'demo-lesson-3', module_id: 'demo-module-2', title: 'Risk management essentials', position: 1, estimated_minutes: 9 }],
+      quizzes: [{ id: 'demo-quiz-2', module_id: 'demo-module-2', title: 'Risk Check', passing_score: 75, xp_reward: 25 }],
     },
   ],
+};
+
+export const demoProgress: LearningProgress = {
+  lessons: [], modules: [{ module_id: 'demo-module-1', unlocked_at: new Date().toISOString(), completed_at: null }], quizzes: [],
 };
