@@ -1,3 +1,4 @@
+import { AppState } from 'react-native';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
 import { demoCourse, demoProfile, demoProgress } from './demo-data';
 import {
@@ -96,6 +97,13 @@ export function LearnerDataProvider({ children }: PropsWithChildren) {
   }, [currentCourse?.id, selectCourse, session?.access_token]);
 
   useEffect(() => { void refresh(); }, [session?.access_token]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && session?.access_token) void refresh();
+    });
+    return () => subscription.remove();
+  }, [refresh, session?.access_token]);
 
   const value = useMemo(() => ({ achievements, bookmarks, courses, currentCourse, error, loading, profile, progress, refresh, selectCourse }),
     [achievements, bookmarks, courses, currentCourse, error, loading, profile, progress, refresh, selectCourse]);
