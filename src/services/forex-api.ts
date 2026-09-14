@@ -1,4 +1,5 @@
 const apiBaseUrl = process.env.EXPO_PUBLIC_API_URL;
+const REQUEST_TIMEOUT_MS = 12000;
 
 export type Course = { id: string; slug: string; title: string; description: string };
 export type Lesson = { content?: unknown; estimated_minutes: number; id: string; module_id: string; position: number; title: string };
@@ -35,13 +36,24 @@ export class ApiError extends Error {
 }
 export function isApiConfigured() { return Boolean(apiBaseUrl); }
 function getApiBaseUrl() { if (!apiBaseUrl) throw new ApiError('EXPO_PUBLIC_API_URL is not configured.', 0); return apiBaseUrl.replace(/\/$/, ''); }
-async function request<T>(path: string, options: RequestInit = {}, accessToken?: string) {
+
+async function performRequest<T>(path: string, options: RequestInit, accessToken?: string) {
   const headers = new Headers(options.headers);
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
   if (options.body) headers.set('Content-Type', 'application/json');
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   let response: Response;
-  try { response = await fetch(`${getApiBaseUrl()}${path}`, { ...options, headers }); }
-  catch { throw new ApiError('Unable to reach the learning API.', 0); }
+  try {
+    response = await fetch(`${getApiBaseUrl()}${path}`, { ...options, headers, signal: controller.signal });
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === 'AbortError';
+    throw new ApiError(timedOut ? 'The request timed out. Check your connection and try again.' : 'You appear to be offline. Check your connection and try again.', 0);
+  } finally {
+    clearTimeout(timeout);
+  }
+
   if (!response.ok) {
     const errorBody = (await response.json().catch(() => ({}))) as ApiErrorBody;
     throw new ApiError(errorBody.error ?? 'The API request failed.', response.status);
@@ -49,9 +61,24 @@ async function request<T>(path: string, options: RequestInit = {}, accessToken?:
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
+
+async function request<T>(path: string, options: RequestInit = {}, accessToken?: string) {
+  const method = (options.method ?? 'GET').toUpperCase();
+  try {
+    return await performRequest<T>(path, options, accessToken);
+  } catch (error) {
+    if (method === 'GET' && error instanceof ApiError && error.status === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      return performRequest<T>(path, options, accessToken);
+    }
+    throw error;
+  }
+}
+
 export const getCourses = () => request<{ courses: Course[] }>('/courses');
 export const getCourse = (courseId: string, accessToken?: string) => request<{ course: CourseRoadmap }>(`/courses/${courseId}`, {}, accessToken);
 export const getCurrentUser = (accessToken: string) => request<{ profile: UserProfile | null }>('/users/me', {}, accessToken);
+export const updateCurrentUser = (accessToken: string, displayName: string) => request<{ profile: UserProfile }>('/users/me', { method: 'PATCH', body: JSON.stringify({ display_name: displayName }) }, accessToken);
 export const getAchievements = (accessToken: string) => request<{ achievements: Achievement[] }>('/users/me/achievements', {}, accessToken);
 export const completeLesson = (accessToken: string, lessonId: string) => request<{ progress: { awarded_xp: number; current_streak?: number } }>(`/progress/lessons/${lessonId}/complete`, { method: 'POST' }, accessToken);
 export const getLearningProgress = (accessToken: string) => request<LearningProgress>('/progress', {}, accessToken);
