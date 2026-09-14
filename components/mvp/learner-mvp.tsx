@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+
 import { useLearnerData } from '../../src/learner-data-context';
 import { useSession } from '../../src/session-context';
 import {
@@ -7,16 +8,20 @@ import {
   type CourseModule, type Lesson, type Quiz,
 } from '../../src/services/forex-api';
 import { colors } from '../../src/theme';
+import { useNetworkStatus } from '../../src/use-network-status';
+import { AccountInfoScreen } from './account-info-screen';
+import { ProfileSettingsScreen } from './profile-settings-screen';
 
-type Screen = 'home' | 'roadmap' | 'lesson' | 'quiz' | 'progress' | 'profile';
+type Screen = 'home' | 'roadmap' | 'lesson' | 'quiz' | 'progress' | 'profile' | 'profile-settings' | 'privacy' | 'support' | 'about';
+
 const demoLessonContent: Record<string, string[]> = {
   'demo-lesson-1': ['A currency pair compares the value of one currency with another.', 'The first currency is the base currency; the second is the quote currency.', 'EUR/USD at 1.1000 means one euro is worth 1.10 US dollars.'],
   'demo-lesson-2': ['A pip is a standard unit of price movement.', 'Position size determines how much each pip is worth.', 'The spread is the difference between bid and ask and is part of your trading cost.'],
   'demo-lesson-3': ['Decide your maximum risk before entering a trade.', 'Use stop losses and position sizing together.', 'Protecting capital is more important than maximizing any single trade.'],
 };
 const demoQuiz: Quiz = { id: 'demo-quiz-1', title: 'Market Foundations Check', passing_score: 70, quiz_questions: [
-  { id: 'dq1', position: 1, prompt: 'In EUR/USD, which currency is the base currency?', answers: ['EUR', 'USD', 'Both'], explanation: 'The first currency in a pair is the base currency.' },
-  { id: 'dq2', position: 2, prompt: 'What does spread represent?', answers: ['Broker trading cost between bid and ask', 'Your account balance', 'A guaranteed profit'], explanation: 'Spread is the distance between bid and ask.' },
+  { id: 'dq1', position: 1, prompt: 'In EUR/USD, which currency is the base currency?', answers: ['EUR', 'USD', 'Both'] },
+  { id: 'dq2', position: 2, prompt: 'What does spread represent?', answers: ['Broker trading cost between bid and ask', 'Your account balance', 'A guaranteed profit'] },
 ] };
 
 function answerOptions(value: unknown): string[] {
@@ -24,6 +29,7 @@ function answerOptions(value: unknown): string[] {
   if (value && typeof value === 'object') return Object.values(value as Record<string, unknown>).map(String);
   return [];
 }
+
 function lessonParagraphs(content: unknown): string[] {
   if (typeof content === 'string') return [content];
   if (Array.isArray(content)) return content.map((item) => typeof item === 'string' ? item : JSON.stringify(item));
@@ -39,6 +45,7 @@ function lessonParagraphs(content: unknown): string[] {
 export function LearnerMvp() {
   const { session, signOut } = useSession();
   const { achievements, bookmarks, courses, currentCourse, error, loading, profile, progress, refresh, selectCourse } = useLearnerData();
+  const isOnline = useNetworkStatus();
   const [screen, setScreen] = useState<Screen>('home');
   const [selectedModule, setSelectedModule] = useState<CourseModule | null>(null);
   const [lesson, setLesson] = useState<Lesson | null>(null);
@@ -51,6 +58,21 @@ export function LearnerMvp() {
   const unlockedModuleIds = useMemo(() => new Set(progress.modules.map((item) => item.module_id)), [progress.modules]);
   const bookmarkedIds = useMemo(() => new Set(bookmarks.map((item) => item.lesson_id)), [bookmarks]);
   const isModuleUnlocked = (module: CourseModule) => module.position === 1 || unlockedModuleIds.has(module.id);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (screen === 'home') return false;
+      if (screen === 'lesson' || screen === 'quiz') setScreen('roadmap');
+      else if (screen === 'profile-settings' || screen === 'privacy' || screen === 'support' || screen === 'about') setScreen('profile');
+      else setScreen('home');
+      return true;
+    });
+    return () => subscription.remove();
+  }, [screen]);
+
+  useEffect(() => {
+    if (isOnline && session?.access_token && isApiConfigured()) void refresh();
+  }, [isOnline]);
 
   async function openLesson(module: CourseModule, lessonId: string) {
     if (!isModuleUnlocked(module)) return;
@@ -67,6 +89,7 @@ export function LearnerMvp() {
 
   async function finishLesson() {
     if (!lesson) return;
+    if (!isOnline && isApiConfigured()) { setResult('You are offline. Reconnect before saving lesson progress.'); return; }
     setBusy(true); setResult(null);
     try {
       if (session?.access_token && isApiConfigured()) {
@@ -83,6 +106,7 @@ export function LearnerMvp() {
     if (!summary || !isModuleUnlocked(module)) return;
     const allLessonsDone = module.lessons.every((item) => completedLessonIds.has(item.id));
     if (isApiConfigured() && session?.access_token && !allLessonsDone) { setResult('Complete every lesson in this module before taking the quiz.'); return; }
+    if (!isOnline && isApiConfigured()) { setResult('You are offline. Reconnect before opening a quiz.'); return; }
     setBusy(true); setSelectedModule(module); setResult(null);
     try {
       setQuiz(!isApiConfigured() || !session?.access_token ? { ...demoQuiz, id: summary.id, title: summary.title, passing_score: summary.passing_score } : (await getQuiz(session.access_token, summary.id)).quiz);
@@ -94,6 +118,7 @@ export function LearnerMvp() {
   async function submitQuiz() {
     if (!quiz) return;
     if (answers.length !== quiz.quiz_questions.length || answers.some((value) => value === undefined)) { setResult('Answer every question before submitting.'); return; }
+    if (!isOnline && isApiConfigured()) { setResult('You are offline. Reconnect before submitting your quiz.'); return; }
     setBusy(true);
     try {
       if (!isApiConfigured() || !session?.access_token) setResult('Demo quiz complete. Connect Supabase to persist scores and unlock modules.');
@@ -108,17 +133,22 @@ export function LearnerMvp() {
 
   async function toggleBookmark() {
     if (!lesson || !session?.access_token || !isApiConfigured()) return;
+    if (!isOnline) { setResult('You are offline. Reconnect before changing bookmarks.'); return; }
     setBusy(true);
     try { bookmarkedIds.has(lesson.id) ? await removeBookmark(session.access_token, lesson.id) : await saveBookmark(session.access_token, lesson.id); await refresh(); }
+    catch (caught) { setResult(caught instanceof Error ? caught.message : 'Unable to update bookmark.'); }
     finally { setBusy(false); }
   }
 
   if (loading) return <Center label="Loading your learning path…" />;
 
+  const secondaryScreen = screen === 'profile-settings' || screen === 'privacy' || screen === 'support' || screen === 'about';
+
   return (
-    <SafeAreaView style={styles.page}>
-      {error ? <View style={styles.error}><Text style={styles.errorText}>{error}</Text><Pressable onPress={() => void refresh()}><Text style={styles.link}>Retry</Text></Pressable></View> : null}
-      <ScrollView contentContainerStyle={styles.content}>
+    <View style={styles.page}>
+      {!isOnline ? <View style={styles.offline}><Text selectable style={styles.offlineText}>Offline · saved server progress cannot update until you reconnect.</Text></View> : null}
+      {error ? <View style={styles.error}><Text selectable style={styles.errorText}>{error}</Text><Pressable onPress={() => void refresh()}><Text style={styles.link}>Retry</Text></Pressable></View> : null}
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
         {screen === 'home' ? <>
           <Text style={styles.eyebrow}>FOREX LEARNING</Text><Text style={styles.hero}>Learn to trade with structure, not hype.</Text>
           <Text style={styles.sub}>Master the market one short lesson at a time. Risk comes before reward.</Text>
@@ -141,7 +171,7 @@ export function LearnerMvp() {
 
         {screen === 'lesson' && lesson ? <>
           <Back onPress={() => setScreen('roadmap')} /><Text style={styles.eyebrow}>LESSON · {lesson.estimated_minutes} MIN</Text><Text style={styles.title}>{lesson.title}</Text>
-          {lessonParagraphs(lesson.content).map((paragraph, index) => <Text key={index} style={styles.lessonBody}>{paragraph}</Text>)}
+          {lessonParagraphs(lesson.content).map((paragraph, index) => <Text selectable key={index} style={styles.lessonBody}>{paragraph}</Text>)}
           {result ? <Notice text={result} /> : null}
           <Pressable disabled={busy} style={styles.primary} onPress={() => void finishLesson()}><Text style={styles.primaryText}>{completedLessonIds.has(lesson.id) ? 'Review completed lesson' : 'Mark lesson complete'}</Text></Pressable>
           {session?.access_token && isApiConfigured() ? <Pressable disabled={busy} style={styles.secondary} onPress={() => void toggleBookmark()}><Text style={styles.secondaryText}>{bookmarkedIds.has(lesson.id) ? 'Remove bookmark' : 'Bookmark lesson'}</Text></Pressable> : null}
@@ -156,18 +186,34 @@ export function LearnerMvp() {
 
         {screen === 'progress' ? <><Text style={styles.eyebrow}>PROGRESS</Text><Text style={styles.title}>Your momentum</Text><View style={styles.stats}><Stat label="XP" value={String(profile?.xp ?? 0)} /><Stat label="Streak" value={`${profile?.current_streak ?? 0}d`} /><Stat label="Best" value={`${profile?.longest_streak ?? 0}d`} /></View><Text style={styles.sectionTitle}>Completed lessons</Text>{progress.lessons.filter((item) => item.completed_at).map((item) => <View key={item.lesson_id} style={styles.simpleRow}><Text style={styles.lessonCheck}>✓</Text><Text style={styles.lessonTitle}>{item.lessons?.title ?? 'Completed lesson'}</Text></View>)}<Text style={styles.sectionTitle}>Achievements</Text>{achievements.length ? achievements.map((item) => <View key={item.id} style={styles.courseCard}><Text style={styles.cardTitle}>{item.title ?? 'Achievement'}</Text><Text style={styles.body}>{item.description}</Text></View>) : <Text style={styles.body}>Complete your first lesson and quiz to start earning achievements.</Text>}</> : null}
 
-        {screen === 'profile' ? <><Text style={styles.eyebrow}>PROFILE</Text><Text style={styles.title}>{profile?.display_name || session?.user?.email || 'Learner'}</Text><Text style={styles.body}>{session?.user?.email ?? 'Demo mode'}</Text><Text style={styles.sectionTitle}>Saved lessons</Text>{bookmarks.length ? bookmarks.map((item) => <View key={item.lesson_id} style={styles.simpleRow}><Text style={styles.lessonCheck}>★</Text><Text style={styles.lessonTitle}>{item.lessons?.title ?? 'Saved lesson'}</Text></View>) : <Text style={styles.body}>You have no saved lessons yet.</Text>}{session ? <Pressable style={styles.danger} onPress={() => void signOut()}><Text style={styles.primaryText}>Sign out</Text></Pressable> : null}</> : null}
+        {screen === 'profile' ? <>
+          <Text style={styles.eyebrow}>PROFILE</Text><Text style={styles.title}>{profile?.display_name || session?.user?.email || 'Learner'}</Text><Text style={styles.body}>{session?.user?.email ?? 'Demo mode'}</Text>
+          <View style={styles.profileMenu}>
+            <MenuButton label="Edit profile" onPress={() => setScreen('profile-settings')} />
+            <MenuButton label="Privacy" onPress={() => setScreen('privacy')} />
+            <MenuButton label="Support" onPress={() => setScreen('support')} />
+            <MenuButton label="About Forex Learning" onPress={() => setScreen('about')} />
+          </View>
+          <Text style={styles.sectionTitle}>Saved lessons</Text>{bookmarks.length ? bookmarks.map((item) => <View key={item.lesson_id} style={styles.simpleRow}><Text style={styles.lessonCheck}>★</Text><Text style={styles.lessonTitle}>{item.lessons?.title ?? 'Saved lesson'}</Text></View>) : <Text style={styles.body}>You have no saved lessons yet.</Text>}
+          {session ? <Pressable style={styles.danger} onPress={() => void signOut()}><Text style={styles.dangerText}>Sign out</Text></Pressable> : null}
+        </> : null}
+
+        {screen === 'profile-settings' ? <ProfileSettingsScreen onBack={() => setScreen('profile')} /> : null}
+        {screen === 'privacy' ? <AccountInfoScreen kind="privacy" onBack={() => setScreen('profile')} /> : null}
+        {screen === 'support' ? <AccountInfoScreen kind="support" onBack={() => setScreen('profile')} /> : null}
+        {screen === 'about' ? <AccountInfoScreen kind="about" onBack={() => setScreen('profile')} /> : null}
         {busy ? <ActivityIndicator style={{ marginTop: 20 }} /> : null}
       </ScrollView>
-      {screen !== 'lesson' && screen !== 'quiz' ? <View style={styles.tabs}>{(['home', 'roadmap', 'progress', 'profile'] as Screen[]).map((item) => <Pressable key={item} style={styles.tab} onPress={() => setScreen(item)}><Text style={[styles.tabText, screen === item && styles.tabActive]}>{item === 'roadmap' ? 'Learn' : item[0].toUpperCase() + item.slice(1)}</Text></Pressable>)}</View> : null}
-    </SafeAreaView>
+      {screen !== 'lesson' && screen !== 'quiz' && !secondaryScreen ? <View style={styles.tabs}>{(['home', 'roadmap', 'progress', 'profile'] as Screen[]).map((item) => <Pressable key={item} style={styles.tab} onPress={() => setScreen(item)}><Text style={[styles.tabText, screen === item && styles.tabActive]}>{item === 'roadmap' ? 'Learn' : item[0].toUpperCase() + item.slice(1)}</Text></Pressable>)}</View> : null}
+    </View>
   );
 }
 
-function Center({ label }: { label: string }) { return <SafeAreaView style={styles.center}><ActivityIndicator /><Text style={styles.body}>{label}</Text></SafeAreaView>; }
+function Center({ label }: { label: string }) { return <View style={styles.center}><ActivityIndicator /><Text style={styles.body}>{label}</Text></View>; }
 function Back({ onPress }: { onPress: () => void }) { return <Pressable onPress={onPress}><Text style={styles.link}>← Back</Text></Pressable>; }
-function Notice({ text }: { text: string }) { return <View style={styles.notice}><Text style={styles.noticeText}>{text}</Text></View>; }
+function Notice({ text }: { text: string }) { return <View style={styles.notice}><Text selectable style={styles.noticeText}>{text}</Text></View>; }
 function Stat({ label, value }: { label: string; value: string }) { return <View style={styles.stat}><Text style={styles.statValue}>{value}</Text><Text style={styles.meta}>{label}</Text></View>; }
+function MenuButton({ label, onPress }: { label: string; onPress: () => void }) { return <Pressable onPress={onPress} style={styles.menuButton}><Text style={styles.menuText}>{label}</Text><Text style={styles.link}>›</Text></Pressable>; }
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.background }, center: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 12 }, content: { padding: 20, paddingBottom: 110, gap: 14 },
@@ -175,8 +221,10 @@ const styles = StyleSheet.create({
   stats: { flexDirection: 'row', gap: 10 }, stat: { flex: 1, backgroundColor: colors.surface, borderRadius: 16, padding: 16 }, statValue: { color: colors.mainText, fontSize: 24, fontWeight: '900' }, meta: { color: colors.mutedText, fontSize: 12, marginTop: 3 },
   courseCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 18, gap: 8 }, moduleCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 16, gap: 12 }, locked: { opacity: 0.55 }, row: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 }, moduleNumber: { width: 34, height: 34, borderRadius: 17, textAlign: 'center', textAlignVertical: 'center', backgroundColor: colors.primary, color: '#06211F', fontWeight: '900' }, badge: { color: colors.accent, fontWeight: '900', fontSize: 11 },
   lessonRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.background, borderRadius: 14, padding: 12 }, lessonCheck: { color: colors.primary, fontSize: 18, fontWeight: '900' }, lessonTitle: { color: colors.mainText, fontWeight: '700', flexShrink: 1 }, quizButton: { borderWidth: 1, borderColor: colors.accent, borderRadius: 14, padding: 13 }, quizText: { color: colors.accent, fontWeight: '800' },
-  primary: { backgroundColor: colors.primary, padding: 15, borderRadius: 14, alignItems: 'center', marginTop: 6 }, primaryText: { color: '#06211F', fontWeight: '900', fontSize: 15 }, secondary: { borderWidth: 1, borderColor: '#334155', padding: 14, borderRadius: 14, alignItems: 'center' }, secondaryText: { color: colors.mainText, fontWeight: '800' }, danger: { backgroundColor: '#F05252', padding: 15, borderRadius: 14, alignItems: 'center', marginTop: 20 },
+  primary: { backgroundColor: colors.primary, padding: 15, borderRadius: 14, alignItems: 'center', marginTop: 6 }, primaryText: { color: '#06211F', fontWeight: '900', fontSize: 15 }, secondary: { borderWidth: 1, borderColor: '#334155', padding: 14, borderRadius: 14, alignItems: 'center' }, secondaryText: { color: colors.mainText, fontWeight: '800' }, danger: { backgroundColor: '#451E27', borderColor: '#7F3444', borderWidth: 1, padding: 15, borderRadius: 14, alignItems: 'center', marginTop: 20 }, dangerText: { color: '#FCA5A5', fontWeight: '900' },
   questionCard: { backgroundColor: colors.surface, borderRadius: 18, padding: 16, gap: 10 }, question: { color: colors.mainText, fontSize: 17, fontWeight: '800', lineHeight: 23 }, answer: { borderWidth: 1, borderColor: '#334155', borderRadius: 12, padding: 13 }, answerSelected: { borderColor: colors.primary, backgroundColor: '#113A39' }, answerText: { color: colors.mainText },
   simpleRow: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingVertical: 10 }, notice: { backgroundColor: '#162C35', borderRadius: 12, padding: 12 }, noticeText: { color: colors.mainText, lineHeight: 20 }, error: { backgroundColor: '#3A1D25', padding: 12, flexDirection: 'row', justifyContent: 'space-between', gap: 12 }, errorText: { color: '#FCA5A5', flex: 1 }, link: { color: colors.primary, fontWeight: '900' },
+  offline: { backgroundColor: '#3A2A12', paddingHorizontal: 14, paddingVertical: 9 }, offlineText: { color: '#F4D68C', textAlign: 'center', fontSize: 12, fontWeight: '700' },
+  profileMenu: { backgroundColor: colors.surface, borderRadius: 18, overflow: 'hidden' }, menuButton: { minHeight: 52, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth }, menuText: { color: colors.mainText, fontWeight: '700' },
   tabs: { position: 'absolute', left: 12, right: 12, bottom: 10, backgroundColor: colors.surface, borderRadius: 20, flexDirection: 'row', padding: 8 }, tab: { flex: 1, alignItems: 'center', paddingVertical: 10 }, tabText: { color: colors.mutedText, fontWeight: '700', fontSize: 12 }, tabActive: { color: colors.primary },
 });
