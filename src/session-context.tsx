@@ -40,9 +40,14 @@ export function SessionProvider({ children }: PropsWithChildren) {
       const params = getAuthParams(url);
       const accessToken = params.get('access_token');
       const refreshToken = params.get('refresh_token');
+      const code = params.get('code');
       const type = params.get('type');
+      const isRecoveryLink = type === 'recovery' || url.includes('/auth/reset-password');
 
-      if (accessToken && refreshToken) {
+      if (code) {
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!error && active) setSession(data.session);
+      } else if (accessToken && refreshToken) {
         const { data, error } = await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken,
@@ -50,7 +55,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
         if (!error && active) setSession(data.session);
       }
 
-      if (type === 'recovery' && active) setRecoveryMode(true);
+      if (isRecoveryLink && active) setRecoveryMode(true);
     }
 
     void supabase.auth.getSession().then(({ data }) => {
