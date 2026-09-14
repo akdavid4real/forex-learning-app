@@ -2,14 +2,19 @@
   "expo": {
     "name": "Forex Learning",
     "slug": "forex-learning-app",
+    "scheme": "forexlearning",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.uefatraders.forexlearning",
+      "buildNumber": "1"
     },
     "android": {
+      "package": "com.uefatraders.forexlearning",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#0B1220",
         "foregroundImage": "./assets/android-icon-foreground.png",
