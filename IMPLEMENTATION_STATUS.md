@@ -11,6 +11,11 @@ This file tracks the MVP-completion branch.
 - [x] Add visible education/forex-risk positioning to the public surface
 - [x] Supabase client/session/auth UI
 - [x] Durable mobile session persistence
+- [x] Password reset request + native recovery deep-link handling
+- [x] Native app scheme, Android package, iOS bundle identifier, and release version metadata
+- [x] EAS development/preview/production build profiles
+- [x] Mobile app error boundary and retry screen
+- [x] Production splash presentation
 - [x] API-backed courses and dynamic roadmap
 - [x] API-backed lesson loading and completion
 - [x] API-backed quizzes, scoring, XP and module unlocks
@@ -23,18 +28,21 @@ This file tracks the MVP-completion branch.
 - [x] Protect quiz reads with module/lesson eligibility checks
 - [x] Persist completion for the implicitly unlocked first module
 - [x] Require exactly one submitted answer per quiz question
+- [x] Learner access entitlement: pending, active, suspended
 - [x] Production-readiness code pass
 
 ## External configuration required for a live environment
 
 These are environment/deployment operations rather than missing product code:
 
-- Apply Supabase migrations `0001`, `0002`, `0003`, then `0004` to the target project.
+- Apply Supabase migrations `0001` through `0005` to the target project.
+- Add `forexlearning://auth/reset-password` to the allowed Supabase Auth redirect URLs so password recovery can return to the installed app.
 - Configure the root Expo environment with `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_SUPABASE_URL`, and `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
 - Configure the public enrollment display values: `EXPO_PUBLIC_PAYMENT_BANK_NAME`, `EXPO_PUBLIC_PAYMENT_ACCOUNT_NAME`, `EXPO_PUBLIC_PAYMENT_ACCOUNT_NUMBER`, and `EXPO_PUBLIC_PAYMENT_WHATSAPP_NUMBER`.
 - Configure the Fastify service with its Supabase service-role credentials and allowed origins.
 - Deploy the Fastify API as its own service and point `EXPO_PUBLIC_API_URL` at `/api/v1` on that service.
 - Regenerate the root Bun lockfile with a Vercel-compatible Bun version. Current Vercel builds complete, but the committed lockfile format is ignored and dependencies are re-resolved.
+- Run real Android and iOS builds, then verify password recovery, session restoration, pending/active access, lesson completion, quiz unlocks, offline/reconnect behavior, and device back-navigation.
 
 ## Deliberate launch scope
 
