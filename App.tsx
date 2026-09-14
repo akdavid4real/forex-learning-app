@@ -1,5 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppErrorBoundary } from './components/common/app-error-boundary';
 import { AuthScreen } from './components/mvp/auth-screen';
 import { LearnerMvp } from './components/mvp/learner-mvp';
 import { LearnerDataProvider, useLearnerData } from './src/learner-data-context';
@@ -30,14 +31,22 @@ function LearnerAccessGate() {
 }
 
 function AppGate() {
-  const { configured, loading, session } = useSession();
+  const { configured, loading, recoveryMode, session } = useSession();
   if (loading) return <View style={styles.center}><ActivityIndicator /><Text style={styles.copy}>Restoring your session…</Text></View>;
+  if (recoveryMode) return <AuthScreen />;
   if (configured && !session) return <AuthScreen />;
   return <LearnerDataProvider><LearnerAccessGate /></LearnerDataProvider>;
 }
 
 export default function App() {
-  return <SessionProvider><StatusBar style="light" /><AppGate /></SessionProvider>;
+  return (
+    <AppErrorBoundary>
+      <SessionProvider>
+        <StatusBar style="light" />
+        <AppGate />
+      </SessionProvider>
+    </AppErrorBoundary>
+  );
 }
 
 const styles = StyleSheet.create({
