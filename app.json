@@ -1,17 +1,27 @@
 {
   "expo": {
-    "name": ".expo-starter",
-    "slug": ".expo-starter",
+    "name": "Forex Learning",
+    "slug": "forex-learning-app",
+    "scheme": "forexlearning",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B1220"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.uefatraders.forexlearning",
+      "buildNumber": "1"
     },
     "android": {
+      "package": "com.uefatraders.forexlearning",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0B1220",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

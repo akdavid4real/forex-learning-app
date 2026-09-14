@@ -1,8 +1,13 @@
 import { registerRootComponent } from 'expo';
+import { createElement } from 'react';
+import { Platform } from 'react-native';
 
-import { LandingPage } from "./components/landing/landing-page";
+import App from './App';
+import { PublicLandingPage } from './components/landing/public-landing-page';
 
-// registerRootComponent registers the public website as the app entry point.
-// It also ensures that whether you load the app in Expo Go or in a native build,
-// the environment is set up appropriately
-registerRootComponent(LandingPage);
+function RootSurface() {
+  // Public enrollment stays on web; native builds launch the learner product.
+  return createElement(Platform.OS === 'web' ? PublicLandingPage : App);
+}
+
+registerRootComponent(RootSurface);

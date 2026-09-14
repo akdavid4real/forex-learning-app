@@ -1,101 +1,112 @@
 # Forex Learning API
 
-Fastify API for the Expo forex-learning app. Bun runs the server, and Supabase
-provides Auth, Postgres, and Storage. The mobile app never receives the
-Supabase service-role key.
+Fastify API for the Expo forex-learning app. Bun runs the service; Supabase provides Auth, Postgres, and Storage. Application decisions stay in Fastify/database functions, and the Supabase service-role key never ships to the client.
 
 ## Run locally
 
-1. Copy `.env.example` to `.env` and supply the Supabase project values.
-2. Apply `supabase/migrations/0001_learning_schema.sql`.
-3. Apply `supabase/migrations/0002_learning_rules.sql`.
-4. From this directory, run `bun install` and `bun run dev`.
+1. Copy `api/.env.example` to `api/.env` and provide the target Supabase values.
+2. Apply these migrations in order from the repository root:
+   - `supabase/migrations/0001_learning_schema.sql`
+   - `supabase/migrations/0002_learning_rules.sql`
+   - `supabase/migrations/0003_seed_forex_foundations.sql`
+   - `supabase/migrations/0004_fix_module_completion.sql`
+   - `supabase/migrations/0005_learner_access.sql`
+3. From `api/`, run `bun install`.
+4. Run `bun run typecheck` and `bun test`.
+5. Start the API with `bun run dev`.
 
-The API listens on `http://localhost:3000` by default. Its health check is
-available at `GET /api/v1/health`.
+The default local service is `http://localhost:3000`; health is `GET /api/v1/health`.
 
-## Authentication
+## Authentication and access
 
-The Expo app signs in directly with Supabase Auth, then passes the session
-access token to Fastify:
+The Expo client authenticates directly with Supabase Auth and sends the resulting access token to Fastify:
 
 ```http
 Authorization: Bearer <access-token>
 ```
 
-Fastify verifies that token with Supabase before a protected route runs.
-Administrative endpoints additionally require `app_metadata.role` to equal
-`admin`. Set that claim with trusted server-side Supabase administration only.
-The migration also creates a profile automatically for each new Supabase user.
+Fastify verifies the token before protected routes execute. Learner accounts have an application-owned `access_status` of `pending`, `active`, or `suspended`. Course discovery and `/users/me` are available to signed-in pending accounts, but lessons, quizzes, progress, bookmarks, and achievements require `active` access. Admin routes additionally require `app_metadata.role = "admin"`; assign that claim only from trusted server-side administration.
 
-## API routes
+## Learner API
 
 | Method | Path | Access | Purpose |
 | --- | --- | --- | --- |
 | GET | `/api/v1/health` | Public | Service status |
 | GET | `/api/v1/courses` | Public | Published course list |
-| GET | `/api/v1/courses/:courseId` | Public | Published course roadmap |
-| GET | `/api/v1/lessons/:lessonId` | Signed in | Published lesson content when unlocked |
-| GET | `/api/v1/users/me` | Signed in | User profile and learning totals |
-| GET | `/api/v1/users/me/achievements` | Signed in | Earned achievements |
-| GET | `/api/v1/bookmarks` | Signed in | Saved lessons |
-| PUT | `/api/v1/bookmarks/:lessonId` | Signed in | Save a lesson |
-| DELETE | `/api/v1/bookmarks/:lessonId` | Signed in | Remove a saved lesson |
-| POST | `/api/v1/progress/lessons/:lessonId/complete` | Signed in | Complete a lesson and update XP/streak |
-| GET | `/api/v1/progress` | Signed in | Lesson completion and viewing history |
-| GET | `/api/v1/quizzes/:quizId` | Signed in | Quiz questions without answer keys |
-| POST | `/api/v1/quizzes/:quizId/attempts` | Signed in | Score answers, award XP, unlock next module |
-| GET/POST/PATCH | `/api/v1/admin/courses` | Admin | List, create, and edit courses |
-| POST/PATCH | `/api/v1/admin/modules` | Admin | Create and edit modules |
-| POST/PATCH | `/api/v1/admin/lessons` | Admin | Create and edit lessons |
-| POST/PATCH | `/api/v1/admin/quizzes` | Admin | Create and edit quizzes |
-| POST/PATCH | `/api/v1/admin/quiz-questions` | Admin | Create and edit quiz questions |
-| POST | `/api/v1/admin/lesson-assets/upload-url` | Admin | Get a short-lived upload URL |
+| GET | `/api/v1/courses/:courseId` | Public | Roadmap with modules, lesson summaries, and quiz metadata |
+| GET | `/api/v1/users/me` | Signed in | Profile, XP, streak totals, and learner access status |
+| PATCH | `/api/v1/users/me` | Signed in | Update learner display name |
+| GET | `/api/v1/lessons/:lessonId` | Active learner | Full lesson content when its module is unlocked |
+| GET | `/api/v1/users/me/achievements` | Active learner | Flattened earned achievements |
+| GET | `/api/v1/bookmarks` | Active learner | Saved lessons, including `lesson_id` |
+| PUT | `/api/v1/bookmarks/:lessonId` | Active learner | Save a lesson |
+| DELETE | `/api/v1/bookmarks/:lessonId` | Active learner | Remove a saved lesson |
+| GET | `/api/v1/progress` | Active learner | Persisted lesson, module, and quiz progress |
+| POST | `/api/v1/progress/lessons/:lessonId/complete` | Active learner | Complete a lesson and update XP/streak |
+| GET | `/api/v1/quizzes/:quizId` | Active learner | Quiz questions after module/lesson eligibility checks |
+| POST | `/api/v1/quizzes/:quizId/attempts` | Active learner | Score answers, award XP, complete/unlock modules |
 
-The quiz attempt request body is:
+Admin content routes remain under `/api/v1/admin` for courses, modules, lessons, quizzes, quiz questions, signed lesson-asset uploads, and learner access management. The admin learner endpoints list learner profiles and update `access_status` after enrollment/payment review.
+
+## Progress response
+
+`GET /api/v1/progress` returns the three state groups the learner client needs:
 
 ```json
 {
-  "answers": [1, 0, 2]
+  "lessons": [],
+  "modules": [],
+  "quizzes": []
 }
 ```
 
-Answer values are zero-based indexes, in the same order as the returned quiz
-questions.
+The client uses these records to display completion and locks, but the server/database remains authoritative.
 
 ## Learning rules
 
-- A first completion awards five XP; retries do not award more lesson XP.
-- A quiz awards its configured XP reward only for the first passing attempt.
-- Completing a first lesson and passing a first quiz each earn a one-time
-  achievement reward.
-- A passing quiz marks its module complete and unlocks the next published
-  module in that course.
-- A learner must complete every published lesson in the module before taking
-  its quiz.
-- The first published module is available immediately. Later modules require
-  an unlock record.
-- Any learning day maintains or advances the user’s streak.
+- First lesson completion awards five lesson XP; retrying does not award it again.
+- First lesson completion can award the one-time first-lesson achievement.
+- A quiz is unavailable until every published lesson in its module is completed.
+- Later modules are unavailable until their unlock record exists.
+- Quiz submissions must contain exactly one answer for every question.
+- A quiz awards its configured XP only for the first passing attempt.
+- First quiz pass can award the one-time first-quiz achievement.
+- Passing upserts completion for the current module (including the implicitly unlocked first module) and unlocks the next published module.
+- Learning activity updates the current and longest streak.
+- Quiz answer keys and answer-revealing explanations never leave the pre-attempt API response.
 
 ## Frontend connection
 
-Use a single API base URL in the Expo environment, such as
-`EXPO_PUBLIC_API_URL=http://localhost:3000/api/v1`. Add the Supabase session
-access token to protected API calls. Do not place
-`SUPABASE_SERVICE_ROLE_KEY` in an Expo environment variable, source file, or
-release build.
+Set the Expo-safe variables shown in the root `.env.example`:
 
-The root `.env.example` shows the Expo-safe public variables. The Supabase anon
-key is for Supabase Auth in the mobile client; the API does not need it.
+```text
+EXPO_PUBLIC_API_URL=https://your-api.example.com/api/v1
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=...
+```
 
-## Supabase Storage
+Never expose `SUPABASE_SERVICE_ROLE_KEY` in Expo variables, source code, or release builds.
 
-Create a private `lesson-assets` bucket in the Supabase project. An
-administrator can request `POST /api/v1/admin/lesson-assets/upload-url` with a
-safe object path such as `courses/forex-foundations/chart.png`, then upload the
-file directly with the returned short-lived signed URL. The API does not expose
-the service-role key to the client.
+## Deployment boundary
 
-## Checks
+The repository root `vercel.json` exports the Expo web application. It does **not** deploy this Fastify server. Deploy `api/` as its own service, configure its Supabase service-role credentials and `ALLOWED_ORIGINS`, then point `EXPO_PUBLIC_API_URL` to that deployment.
 
-Run `bun run typecheck` and `bun test` from `api/`.
+## Storage
+
+Create a private Supabase bucket named `lesson-assets`. Admins can request a short-lived signed upload URL through `POST /api/v1/admin/lesson-assets/upload-url`; clients never receive the service-role key.
+
+## Release checks
+
+From `api/`:
+
+```bash
+bun run typecheck
+bun test
+```
+
+From the repository root after dependencies are installed:
+
+```bash
+bun run typecheck
+npx expo export --platform web
+```

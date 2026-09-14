@@ -6,7 +6,10 @@ export const colors = {
   primaryDark: "#0F8F82",
   accent: "#F4B942",
   text: "#F8FAFC",
+  mainText: "#F8FAFC",
   mutedText: "#94A3B8",
   border: "#263650",
   progressTrack: "#31415A",
+  success: "#22C55E",
+  danger: "#F05252",
 };

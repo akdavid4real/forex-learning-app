@@ -1,7 +1,12 @@
-// Replace these placeholders with the payment and WhatsApp details before launch.
+const accountName = process.env.EXPO_PUBLIC_PAYMENT_ACCOUNT_NAME?.trim() ?? '';
+const accountNumber = process.env.EXPO_PUBLIC_PAYMENT_ACCOUNT_NUMBER?.trim() ?? '';
+const bankName = process.env.EXPO_PUBLIC_PAYMENT_BANK_NAME?.trim() ?? '';
+const whatsAppProofNumber = process.env.EXPO_PUBLIC_PAYMENT_WHATSAPP_NUMBER?.trim() ?? '';
+
 export const paymentDetails = {
-  accountName: "Add your account name",
-  accountNumber: "Add your account number",
-  bankName: "Add your bank name",
-  whatsAppProofNumber: "Add your WhatsApp number",
+  accountName,
+  accountNumber,
+  bankName,
+  whatsAppProofNumber,
+  configured: Boolean(accountName && accountNumber && bankName && whatsAppProofNumber),
 };

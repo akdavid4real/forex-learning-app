@@ -19,8 +19,16 @@ const uploadUrlBodySchema = z.object({
     .regex(/^[a-zA-Z0-9][a-zA-Z0-9/_-]*\.[a-zA-Z0-9]+$/),
 });
 
+const learnerAccessSchema = z.object({
+  access_status: z.enum(['pending', 'active', 'suspended']),
+});
+
 type CourseParams = {
   courseId: string;
+};
+
+type LearnerParams = {
+  userId: string;
 };
 
 export function createAdminRoutes(services: AppServices): FastifyPluginAsync {
@@ -31,10 +39,7 @@ export function createAdminRoutes(services: AppServices): FastifyPluginAsync {
         .select('id, slug, title, description, status, created_at, updated_at')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        throw error;
-      }
-
+      if (error) throw error;
       return { courses: data };
     });
 
@@ -51,10 +56,7 @@ export function createAdminRoutes(services: AppServices): FastifyPluginAsync {
         .select('id, slug, title, description, status')
         .single();
 
-      if (error) {
-        throw error;
-      }
-
+      if (error) throw error;
       return reply.code(201).send({ course: data });
     });
 
@@ -79,15 +81,53 @@ export function createAdminRoutes(services: AppServices): FastifyPluginAsync {
           .select('id, slug, title, description, status')
           .maybeSingle();
 
-        if (error) {
-          throw error;
-        }
-
-        if (!data) {
-          return reply.code(404).send({ error: 'Course not found.' });
-        }
-
+        if (error) throw error;
+        if (!data) return reply.code(404).send({ error: 'Course not found.' });
         return { course: data };
+      },
+    );
+
+    app.get('/learners', { preHandler: requireAdmin(services) }, async () => {
+      const [{ data: profiles, error: profileError }, { data: authData, error: authError }] = await Promise.all([
+        services.supabase!
+          .from('profiles')
+          .select('id, display_name, access_status, xp, current_streak, created_at')
+          .order('created_at', { ascending: false }),
+        services.supabase!.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+      ]);
+
+      if (profileError) throw profileError;
+      if (authError) throw authError;
+
+      const emailById = new Map(authData.users.map((user) => [user.id, user.email ?? null]));
+      return {
+        learners: (profiles ?? []).map((profile) => ({
+          ...profile,
+          email: emailById.get(profile.id) ?? null,
+        })),
+      };
+    });
+
+    app.patch(
+      '/learners/:userId/access',
+      { preHandler: requireAdmin(services) },
+      async (request, reply) => {
+        const parsedBody = learnerAccessSchema.safeParse(request.body);
+        if (!parsedBody.success) {
+          return reply.code(400).send({ error: 'A valid learner access status is required.' });
+        }
+
+        const { userId } = request.params as LearnerParams;
+        const { data, error } = await services.supabase!
+          .from('profiles')
+          .update({ access_status: parsedBody.data.access_status, updated_at: new Date().toISOString() })
+          .eq('id', userId)
+          .select('id, display_name, access_status, xp, current_streak')
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!data) return reply.code(404).send({ error: 'Learner not found.' });
+        return { learner: data };
       },
     );
 
@@ -107,10 +147,7 @@ export function createAdminRoutes(services: AppServices): FastifyPluginAsync {
           .from('lesson-assets')
           .createSignedUploadUrl(parsedBody.data.path);
 
-        if (error) {
-          throw error;
-        }
-
+        if (error) throw error;
         return reply.code(201).send({ upload: data });
       },
     );
