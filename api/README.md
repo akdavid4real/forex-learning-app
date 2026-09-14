@@ -10,13 +10,14 @@ Fastify API for the Expo forex-learning app. Bun runs the service; Supabase prov
    - `supabase/migrations/0002_learning_rules.sql`
    - `supabase/migrations/0003_seed_forex_foundations.sql`
    - `supabase/migrations/0004_fix_module_completion.sql`
+   - `supabase/migrations/0005_learner_access.sql`
 3. From `api/`, run `bun install`.
 4. Run `bun run typecheck` and `bun test`.
 5. Start the API with `bun run dev`.
 
 The default local service is `http://localhost:3000`; health is `GET /api/v1/health`.
 
-## Authentication
+## Authentication and access
 
 The Expo client authenticates directly with Supabase Auth and sends the resulting access token to Fastify:
 
@@ -24,7 +25,7 @@ The Expo client authenticates directly with Supabase Auth and sends the resultin
 Authorization: Bearer <access-token>
 ```
 
-Fastify verifies the token before protected routes execute. Admin routes additionally require `app_metadata.role = "admin"`; assign that claim only from trusted server-side administration.
+Fastify verifies the token before protected routes execute. Learner accounts have an application-owned `access_status` of `pending`, `active`, or `suspended`. Course discovery and `/users/me` are available to signed-in pending accounts, but lessons, quizzes, progress, bookmarks, and achievements require `active` access. Admin routes additionally require `app_metadata.role = "admin"`; assign that claim only from trusted server-side administration.
 
 ## Learner API
 
@@ -33,18 +34,19 @@ Fastify verifies the token before protected routes execute. Admin routes additio
 | GET | `/api/v1/health` | Public | Service status |
 | GET | `/api/v1/courses` | Public | Published course list |
 | GET | `/api/v1/courses/:courseId` | Public | Roadmap with modules, lesson summaries, and quiz metadata |
-| GET | `/api/v1/lessons/:lessonId` | Signed in | Full lesson content when its module is unlocked |
-| GET | `/api/v1/users/me` | Signed in | Profile, XP, and streak totals |
-| GET | `/api/v1/users/me/achievements` | Signed in | Flattened earned achievements |
-| GET | `/api/v1/bookmarks` | Signed in | Saved lessons, including `lesson_id` |
-| PUT | `/api/v1/bookmarks/:lessonId` | Signed in | Save a lesson |
-| DELETE | `/api/v1/bookmarks/:lessonId` | Signed in | Remove a saved lesson |
-| GET | `/api/v1/progress` | Signed in | Persisted lesson, module, and quiz progress |
-| POST | `/api/v1/progress/lessons/:lessonId/complete` | Signed in | Complete a lesson and update XP/streak |
-| GET | `/api/v1/quizzes/:quizId` | Signed in | Quiz questions after module/lesson eligibility checks |
-| POST | `/api/v1/quizzes/:quizId/attempts` | Signed in | Score answers, award XP, complete/unlock modules |
+| GET | `/api/v1/users/me` | Signed in | Profile, XP, streak totals, and learner access status |
+| PATCH | `/api/v1/users/me` | Signed in | Update learner display name |
+| GET | `/api/v1/lessons/:lessonId` | Active learner | Full lesson content when its module is unlocked |
+| GET | `/api/v1/users/me/achievements` | Active learner | Flattened earned achievements |
+| GET | `/api/v1/bookmarks` | Active learner | Saved lessons, including `lesson_id` |
+| PUT | `/api/v1/bookmarks/:lessonId` | Active learner | Save a lesson |
+| DELETE | `/api/v1/bookmarks/:lessonId` | Active learner | Remove a saved lesson |
+| GET | `/api/v1/progress` | Active learner | Persisted lesson, module, and quiz progress |
+| POST | `/api/v1/progress/lessons/:lessonId/complete` | Active learner | Complete a lesson and update XP/streak |
+| GET | `/api/v1/quizzes/:quizId` | Active learner | Quiz questions after module/lesson eligibility checks |
+| POST | `/api/v1/quizzes/:quizId/attempts` | Active learner | Score answers, award XP, complete/unlock modules |
 
-Admin content routes remain under `/api/v1/admin` for courses, modules, lessons, quizzes, quiz questions, and signed lesson-asset uploads.
+Admin content routes remain under `/api/v1/admin` for courses, modules, lessons, quizzes, quiz questions, signed lesson-asset uploads, and learner access management. The admin learner endpoints list learner profiles and update `access_status` after enrollment/payment review.
 
 ## Progress response
 
@@ -71,7 +73,7 @@ The client uses these records to display completion and locks, but the server/da
 - First quiz pass can award the one-time first-quiz achievement.
 - Passing upserts completion for the current module (including the implicitly unlocked first module) and unlocks the next published module.
 - Learning activity updates the current and longest streak.
-- Quiz answer keys never leave the API.
+- Quiz answer keys and answer-revealing explanations never leave the pre-attempt API response.
 
 ## Frontend connection
 
